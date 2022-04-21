@@ -1,3 +1,5 @@
+import page2
+import page1
 from dash import Dash, dcc, html, Input, Output
 import plotly.express as px
 import pandas as pd
@@ -41,10 +43,22 @@ resultado['votos_perc'] = (resultado['votos'] / resultado.groupby(
 candidaturas = resultado["candidatura"].unique()
 
 
-app = Dash(__name__)
+app = Dash(__name__, suppress_callback_exceptions=True)
+server = app.server
 
 app.layout = html.Div([
-    html.H3('Prototipo elecciones Provincia de Buenos Aires'),
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='page-content')
+])
+
+index_page = html.Div([
+    html.Div(
+        className="app-header",
+        children=[
+            html.Div('Análisis Elecciones - Provincia de Buenos Aires',
+                     className="app-header--title")
+        ]
+    ),
     html.P("Seleccione una candidatura:"),
     dcc.RadioItems(
         id='candidatura',
@@ -53,6 +67,10 @@ app.layout = html.Div([
         inline=True
     ),
     dcc.Graph(id="graph"),
+
+    dcc.Link('Go to Page 1', href='/page1'),
+    html.Br(),
+    dcc.Link('Go to Page 2', href='/page2'),
 ])
 
 
@@ -61,13 +79,15 @@ app.layout = html.Div([
     Input("candidatura", "value"))
 def display_choropleth(candidatura):
 
+    scale = "blues" if candidatura == "FRENTE DE TODOS" else "orrd" if candidatura == "JUNTOS" else "rdpu" if candidatura == "AVANZA LIBERTAD" else "reds" if candidatura == "FRENTE DE IZQUIERDA Y DE TRABAJADORES - UNIDAD" else "greens" if candidatura == "FRENTE VAMOS CON VOS" else "inferno"
+
     dff = resultado[resultado['candidatura'] == candidatura]
 
     fig = px.choropleth_mapbox(
-        dff, geojson=municipios_geo, color="votos_perc",
+        dff, geojson=municipios_geo, color="votos_perc", color_continuous_scale=scale,
         locations="id_concat", featureidkey="properties.id_concat",
-        center={"lat": -36.441723, "lon": -59.996306}, zoom=5,
-        range_color=[0, 100],
+        center={"lat": -36.441723, "lon": -59.996306}, zoom=6,
+        range_color=[dff["votos_perc"].min(), dff["votos_perc"].max()],
         width=1300, height=1000)
     fig.update_layout(
 
@@ -76,4 +96,16 @@ def display_choropleth(candidatura):
     return fig
 
 
-app.run_server(debug=True)
+@app.callback(Output('page-content', 'children'),
+              Input('url', 'pathname'))
+def display_page(pathname):
+    if pathname == '/page1':
+        return page1.layout
+    elif pathname == '/page2':
+        return page2.layout
+    else:
+        return index_page
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
