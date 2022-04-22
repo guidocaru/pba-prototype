@@ -133,3 +133,6 @@ data/
 
 #credentials
 credentials.json
+
+#notebook test
+test.ipynb

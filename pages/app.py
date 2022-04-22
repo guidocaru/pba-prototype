@@ -32,15 +32,16 @@ res = requests.get(
 municipios_geo = json.loads(res.text)
 
 # acorta el df de resultados para test
-resultado = resultado[resultado['paso'] == 0]
+#resultado = resultado[resultado['paso'] == 0]
 
-resultado = resultado.groupby(['fecha', 'municipio', 'candidatura', 'id_concat']).agg(
+resultado = resultado.groupby(['fecha', 'municipio', 'candidatura', 'id_concat', 'paso']).agg(
     {'votos': 'sum'}).reset_index()
 
 resultado['votos_perc'] = (resultado['votos'] / resultado.groupby(
     ['fecha', 'municipio', 'id_concat'])['votos'].transform('sum')) * 100
 
 candidaturas = resultado["candidatura"].unique()
+tipo_eleccion = resultado["paso"].unique()
 
 
 app = Dash(__name__, suppress_callback_exceptions=True)
@@ -60,12 +61,15 @@ index_page = html.Div([
         ]
     ),
     html.P("Seleccione una candidatura:"),
-    dcc.RadioItems(
-        id='candidatura',
-        options=[{'label': i, 'value': i} for i in candidaturas],
-        value="FRENTE DE TODOS",
-        inline=True
-    ),
+
+    dcc.Dropdown(id='candidatura',
+                 options=[{'label': i, 'value': i} for i in candidaturas],
+                 value="+ VALORES",),
+
+    dcc.Dropdown(id='tipo_eleccion',
+                 options=[{'label': i, 'value': i} for i in tipo_eleccion],
+                 value=0,),
+
     dcc.Graph(id="graph"),
 
     dcc.Link('Go to Page 1', href='/page1'),
@@ -76,19 +80,24 @@ index_page = html.Div([
 
 @app.callback(
     Output("graph", "figure"),
-    Input("candidatura", "value"))
-def display_choropleth(candidatura):
+    Input("candidatura", "value"),
+    Input("tipo_eleccion", "value"))
+def display_choropleth(candidatura, tipo_eleccion):
+    int(tipo_eleccion)
 
     scale = "blues" if candidatura == "FRENTE DE TODOS" else "orrd" if candidatura == "JUNTOS" else "rdpu" if candidatura == "AVANZA LIBERTAD" else "reds" if candidatura == "FRENTE DE IZQUIERDA Y DE TRABAJADORES - UNIDAD" else "greens" if candidatura == "FRENTE VAMOS CON VOS" else "inferno"
 
     dff = resultado[resultado['candidatura'] == candidatura]
+    dff = dff[dff['paso'] == tipo_eleccion]
 
     fig = px.choropleth_mapbox(
         dff, geojson=municipios_geo, color="votos_perc", color_continuous_scale=scale,
         locations="id_concat", featureidkey="properties.id_concat",
         center={"lat": -36.441723, "lon": -59.996306}, zoom=6,
         range_color=[dff["votos_perc"].min(), dff["votos_perc"].max()],
-        width=1300, height=1000)
+        width=1300, height=1000,
+    )
+
     fig.update_layout(
 
         mapbox_accesstoken=token)
